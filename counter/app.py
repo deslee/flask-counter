@@ -28,7 +28,7 @@ def findOne(Model, **query):
 	except:
 		return None
 
-@app.route('/counter')
+@app.route('/counter/')
 def hello():
 	counter = findOne(Counter, site=app.config['SITE_NAME'])
 	d = {}
