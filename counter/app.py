@@ -4,7 +4,6 @@ from flask.ext.mongoengine import MongoEngine
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'adioasdjasiodjasiodasjd'
-app.config['SITE_NAME'] = 'deslee'
 app.config['MONGODB_SETTINGS'] = {
 	'DB': 'deslee-counter',
 }
@@ -30,24 +29,29 @@ def findOne(Model, **query):
 
 @app.route('/counter/')
 def hello():
-	counter = findOne(Counter, site=app.config['SITE_NAME'])
+	data = request.args['url']
+	counter = findOne(Counter, site=data)
+
+	if not counter:
+		counter = Counter(site=data, count=0)
+
 	d = {}
-	if counter:
-		counter.count += 1
-		counter.save()
-		d['total'] = counter.count
+	counter.count += 1
+	counter.save()
+	d['total'] = counter.count
 
-		user = findOne(UniqueVisitor, ip=request.remote_addr, site=app.config['SITE_NAME'])
-		if user:
-			user.count += 1
-			user.save()
-			d['user'] = user.count
-		else:
-			user = UniqueVisitor(ip=request.remote_addr, site=app.config['SITE_NAME'], count=1)
-			user.save()
-			d['user'] = user.count
+	user = findOne(UniqueVisitor, ip=request.remote_addr, site=data)
+	if user:
+		user.count += 1
+		user.save()
+		d['user'] = user.count
+	else:
+		user = UniqueVisitor(ip=request.remote_addr, site=data, count=1)
+		user.save()
+		d['user'] = user.count
 
-		uniques = UniqueVisitor.objects(site=app.config['SITE_NAME'])
-		d['unique'] = len(uniques)	
-		
+	uniques = UniqueVisitor.objects(site=data)
+	d['unique'] = len(uniques)	
+	d['url'] = data
+
 	return jsonify(**d)
