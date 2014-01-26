@@ -9,17 +9,16 @@ app.config['MONGODB_SETTINGS'] = {
 }
 db = MongoEngine(app)
 
-class UniqueVisitor(db.Document):
-	ip = StringField(max_length=100, required=True)
-	site = StringField(max_length=100, required=True, unique_with='ip')
-	count = IntField()
-
-class Counter(db.Document):
-	site = StringField(max_length=100, required=True, unique=True)
-	count = IntField()
+class Site(db.Document):
+	name = StringField(max_length=100, required=True, unique=True)
 	
 	def __str__(self):
 		return "{}: {}".format(self.site,self.count)
+
+class UniqueVisitor(db.Document):
+	ip = StringField(max_length=100, required=True)
+	site = ReferenceField(Site, required=True, unique_with='ip')
+	count = IntField()
 
 def findOne(Model, **query):
 	try:
@@ -30,28 +29,27 @@ def findOne(Model, **query):
 @app.route('/counter/')
 def hello():
 	data = request.args['url']
-	counter = findOne(Counter, site=data)
+	site = findOne(Site, name=data)
 
-	if not counter:
-		counter = Counter(site=data, count=0)
+	if not site:
+		site = Site(name=data)
+		site.save()
 
 	d = {}
-	counter.count += 1
-	counter.save()
-	d['total'] = counter.count
 
-	user = findOne(UniqueVisitor, ip=request.remote_addr, site=data)
+	user = findOne(UniqueVisitor, ip=request.remote_addr, site=site)
 	if user:
 		user.count += 1
-		user.save()
-		d['user'] = user.count
 	else:
-		user = UniqueVisitor(ip=request.remote_addr, site=data, count=1)
-		user.save()
-		d['user'] = user.count
+		user = UniqueVisitor(ip=request.remote_addr, site=site, count=1)
 
-	uniques = UniqueVisitor.objects(site=data)
+	user.save()
+	d['user'] = user.count
+
+	uniques = UniqueVisitor.objects(site=site)
 	d['unique'] = len(uniques)	
 	d['url'] = data
+
+	d['total'] = sum([unique.count for unique in uniques])
 
 	return jsonify(**d)
